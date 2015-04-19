@@ -1,25 +1,84 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
-
-
+Bartosz Janeczek
+Reproducible Research - Assignment 1
+====
 ## Loading and preprocessing the data
-
-
-
+First what I need is to download source data, unzip it, convert date format.
+```{r}
+temp <- tempfile()
+download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp)
+data <- read.csv(unz(temp, "activity.csv"),colClasses=c("integer","character","integer"))
+unlink(temp)
+data$date=as.Date(as.character(as.vector(data$date)), format="%Y-%m-%d")
+```
 ## What is mean total number of steps taken per day?
+Let's calculate it.
+```{r}
+sums=aggregate(steps~date, data=data, FUN=sum)
+colnames(sums)[2]<-"sums"
+print(sums)
+```
+and produce histogram
+```{r}
+hist(sums$sums)
+```
 
-
+and find mean and median of the total number of steps taken per day
+```{r}
+summary(sums$sums)[3:4]
+```
 
 ## What is the average daily activity pattern?
+Lets aggregate data against 5-minute intervals, plot it
+```{r}
+means5min=aggregate(steps~interval, data=data, FUN=mean)
+plot(x=means5min$interval,means5min$steps,type = "l")
+```
 
-
+And find which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps
+```{r}
+means5min$interval[means5min$steps==max(means5min$steps)]
+```
 
 ## Imputing missing values
+Total number of missing values in the dataset (i.e. the total number of rows with NAs).
+```{r}
+sum(is.na(data$steps))
+```
 
+Lets use 5-min interval mean for missing values and create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+data_noNAs <- merge(data,means5min,by.x="interval",by.y="interval",suffixes=c("","M"))
+data_noNAs$steps[is.na(data_noNAs$steps)] <- data_noNAs$stepsM[is.na(data_noNAs$steps)]
+```
 
+Now lets make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day. 
+
+```{r}
+sums_noNAs=aggregate(steps~date, data=data_noNAs, FUN=sum)
+colnames(sums_noNAs)[2]<-"sums"
+hist(sums_noNAs$sums)
+summary(sums_noNAs$sums)[3:4]
+```
+
+These values do not differ much from the estimates from the first part of the assignment (only median is sligtly different). The most difference is in frequences (please see histogram) - we have more filled values with no importand change of overall statistics.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+Sys.setlocale("LC_TIME", "English")
+data_noNAs$day[weekdays(data_noNAs$date) %in% c("Saturday","Sunday")]<-"Weekend"
+data_noNAs$day[is.na(data_noNAs$day)]<-"Weekday"
+data_noNAs$day=as.factor(data_noNAs$day)
+
+
+```
+
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+```{r}
+par(mfrow=c(2,1))
+data_noNAs_means5min=aggregate(steps~interval+day, data=data_noNAs, FUN=mean)
+plot(x=data_noNAs_means5min$interval[data_noNAs_means5min$day=="Weekday"],data_noNAs_means5min$steps[data_noNAs_means5min$day=="Weekday"],type = "l",main="Weekday")
+plot(x=data_noNAs_means5min$interval[data_noNAs_means5min$day=="Weekend"],data_noNAs_means5min$steps[data_noNAs_means5min$day=="Weekend"],type = "l",main="Weekend")
+```
+
